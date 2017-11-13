@@ -1,0 +1,202 @@
+<?php
+/**
+ * @file
+ * Code for the Testcase module feature.
+ */
+
+include_once 'testcase_module.features.inc';
+
+/**
+ * Implements hook_theme().
+ */
+function testcase_module_theme() {
+  return array(
+    'testcase_blog' => array(
+      'render element' => 'content',
+      'base hook' => 'node',
+      'template' => 'testcase-blog',
+    ),
+  );
+}
+
+/**
+ * Implements hook_preprocess_HOOK().
+ */
+function testcase_module_preprocess_node(&$variables) {
+  $node = $variables['node'];
+  if ($node->type == 'blog') {
+    $variables['theme_hook_suggestions'][] = 'testcase_blog';
+    $variables['classes_array'][] = $variables['zebra'];
+  }
+}
+
+/**
+ * Implements hook_block_info().
+ */
+function testcase_module_block_info() {
+  $blocks['testcase_module_block_last_blog'] = array(
+    'info' => t('Last 3 Blog'),
+    'status' => 1,
+    'region' => 'sidebar_first',
+  );
+
+  return $blocks;
+}
+
+/**
+ * Implements hook_block_view().
+ */
+function testcase_module_block_view($delta = '') {
+  $block = array();
+  // The $delta parameter tells us which block is being requested.
+  switch ($delta) {
+    case 'testcase_module_block_last_blog':
+      // Create your block content here.
+      $block['subject'] = t('Last 3 blog');
+
+      $query = new EntityFieldQuery();
+      // Change news by the name of your content type.
+      $entities = $query->entityCondition('entity_type', 'node')
+        ->entityCondition('bundle', 'blog')
+        ->propertyCondition('status', NODE_PUBLISHED)
+        ->propertyOrderBy("created", "DESC")
+        ->range(0, 3)
+        ->execute();
+
+      $nodes = array();
+      if (isset($entities['node'])) {
+        $nids = array_keys($entities['node']);
+        $nodes = node_load_multiple($nids);
+      }
+
+      $items = array();
+      foreach ($nodes as $node) {
+        $items[] = array(
+          'data' => l($node->title, 'node/' . $node->nid),
+        );
+      }
+      if (empty($items)) {
+        $block['content'] = t('No posts available.');
+      }
+      else {
+        $block['content'] = theme('item_list', array('items' => $items));
+      }
+      break;
+  }
+  return $block;
+}
+
+/**
+ * Implements hook_views_api().
+ */
+function testcase_module_views_api() {
+  return array(
+    'api' => 3.0,
+  );
+}
+
+
+/**
+ * Implements hook_webform_select_options_info().
+ */
+function testcase_module_webform_select_options_info() {
+  $items = array();
+  $items['day_of_week​'] = array(
+    'title' => t('List node blog'),
+    'options callback' => 'testcase_module_webform_list_node_blog',
+  );
+  return $items;
+}
+
+/**
+ * Webform options info callback.
+ */
+function testcase_module_webform_list_node_blog() {
+  $list = array();
+  $query = db_select('node', 'n');
+  $query->fields('n', array('nid', 'title'));
+  $query->condition('type', 'blog');
+  $query->condition('status', NODE_PUBLISHED);
+  $query->orderBy('created', 'DESC');
+  $nodes = $query->execute()->fetchAll();
+
+  if (!empty($nodes)) {
+    foreach ($nodes as $node) {
+      $list[$node->nid] = $node->title;
+    }
+  }
+
+  return $list;
+}
+
+/**
+ * Implements hook_ctools_plugin_directory().
+ */
+function testcase_module_ctools_plugin_directory($owner, $plugin_type) {
+  if ($owner == 'ctools' && $plugin_type == 'content_types') {
+    return 'plugins/content_types';
+  }
+}
+
+/**
+ * Content type settings form.
+ */
+function testcase_module_last_blog_edit_form($form, &$form_state) {
+  $conf = $form_state['conf'];
+
+  $form['link'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Link title to node'),
+    '#default_value' => isset($conf['link']) ? $conf['link'] : '',
+  );
+
+  return $form;
+}
+
+/**
+ * Content type submit handler.
+ */
+function testcase_module_last_blog_edit_form_submit($form, &$form_state) {
+  foreach (array('link') as $key) {
+    $form_state['conf'][$key] = $form_state['values'][$key];
+  }
+}
+
+/**
+ * Callback to Panel Last Blog.
+ */
+function testcase_module_last_blog_render($subtype, $conf, $args, $context) {
+  $query = db_select('node', 'n');
+  $query->fields('n', array('nid', 'title'));
+  $query->condition('type', 'blog');
+  $query->condition('status', NODE_PUBLISHED);
+  $query->orderBy('created', 'DESC');
+  $query->range(0, 4);
+  $results = $query->execute()->fetchAll();
+
+  $items = array();
+
+  foreach ($results as $result) {
+    if (isset($conf['link'])) {
+      $items[] = l($result->title, 'node/' . $result->nid);
+    }
+    else {
+      $items[] = $result->title;
+    }
+  }
+
+  $block = new stdClass();
+  $block->title = t('Last blog');
+  $block->content = theme('item_list', array('items' => $items));
+
+  return $block;
+}
+
+/**
+ * Implements hook_webservices_controller().
+ */
+function testcase_module_webservices_controller() {
+  return array(
+    'blog' => 'TestcaseBlogController',
+  );
+}

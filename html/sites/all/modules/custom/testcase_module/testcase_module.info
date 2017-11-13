@@ -1,0 +1,22 @@
+name = Testcase module
+description = This module to perform the test task
+core = 7.x
+package = Testcase
+version = 7.x-1.0
+dependencies[] = features
+dependencies[] = image
+dependencies[] = link
+dependencies[] = text
+dependencies[] = views
+dependencies[] = webform
+dependencies[] = webservices
+features[features_api][] = api:2
+features[field_base][] = body
+features[field_base][] = field_picture
+features[field_base][] = field_source_link
+features[field_instance][] = node-blog-body
+features[field_instance][] = node-blog-field_picture
+features[field_instance][] = node-blog-field_source_link
+features[node][] = blog
+
+files[] = controllers/testcase.blog.inc
